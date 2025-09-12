@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 ########################################################################
 #
-# check_snmp_time.pl v3.3 (2025-08-05)
+# check_time_snmp.pl v3.3 (2025-08-05)
 #
 # Purpose:
 #   Nagios/Icinga plugin to check device time via SNMP against local time or NTP
@@ -26,10 +26,10 @@
 #
 # Usage Examples:
 #   Basic SNMPv2c check:
-#     check_snmp_time.pl -H 192.168.1.1 -C public -w 60 -c 180
+#     check_time_snmp.pl -H 192.168.1.1 -C public -w 60 -c 180
 #
 #   SNMPv3 with timezone and NTP:
-#     check_snmp_time.pl -H firewall --protocol 3 --username snmp \
+#     check_time_snmp.pl -H firewall --protocol 3 --username snmp \
 #       --authpassword pass --authprotocol MD5 --privpassword pass --privprotocol AES \
 #       --oid 1.3.6.1.4.1.34849.1.1.1.3.12.0 --time-format '%a %b %e %H:%M:%S %Y' \
 #       --timezone '+0300' --ntp-server srv-ntp.holding.com -w 60 -c 180
@@ -98,7 +98,7 @@ if ($opt_help) {
 
 # Display version information
 if ($opt_version) {
-    print "check_snmp_time.pl v3.3 (2025-08-05)\n";
+    print "check_time_snmp.pl v3.3 (2025-08-05)\n";
     print "Nagios/Icinga plugin for time synchronization checks\n";
     exit $ERRORS{'OK'};
 }
@@ -375,7 +375,7 @@ sub format_perf_threshold {
 # Helper function for usage information
 sub print_help {
     print <<EOT;
-check_snmp_time.pl v3.3 - Nagios/Icinga Plugin for Time Synchronization Checks
+check_time_snmp.pl v3.3 - Nagios/Icinga Plugin for Time Synchronization Checks
 
 Usage: $0 -H <host> -w <warn_range> -c <crit_range> [options]
 
