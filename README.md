@@ -1,6 +1,6 @@
 ## About
 
-**check_snmp_time** - Icinga Plugin Script (Check Command). 
+**check_time_snmp** - Icinga Plugin Script (Check Command). 
 
 Nagios/Icinga plugin to check device time via SNMP against local time or NTP
 
@@ -16,7 +16,7 @@ Features:
 Tested on:
 - Debian GNU/Linux 12.11 (Bookworm) with Icinga r2.15.0-1, snmpget 5.9.3
 
-Put here: /usr/lib/nagios/plugins/check_snmp_time.pl
+Put here: /usr/lib/nagios/plugins/check_time_snmp.pl
 
 PreReq: **snpmget** tool
 
@@ -24,7 +24,7 @@ PreReq: **snpmget** tool
 
 
 ```
-$ ./check_snmp_time.pl -H <host> -w <warn_range> -c <crit_range> [options]
+$ ./check_time_snmp.pl -H <host> -w <warn_range> -c <crit_range> [options]
 
 Required parameters:
   -H, --host <hostname>        Target hostname or IP address
@@ -82,13 +82,13 @@ Note: For time formats, use standard strftime specifiers. Common formats:
 Basic check with symmetric thresholds:
 
 ```
-$ ./check_snmp_time.pl -H router1 -C public -w 60 -c 180
+$ ./check_time_snmp.pl -H router1 -C public -w 60 -c 180
 ```
 
 SNMPv3 with asymmetric thresholds:
 
 ```
-$ ./check_snmp_time.pl -H switch1 --protocol 3 --username admin --authpassword pass \
+$ ./check_time_snmp.pl -H switch1 --protocol 3 --username monitor --authpassword pass \
         --authprotocol MD5 --privpassword pass --privprotocol AES \
         --oid 1.3.6.1.4.1.9999.1.2.3 --time-format "%Y-%m-%d %H:%M:%S" \
         -w -120:60 -c -300:120
@@ -97,6 +97,6 @@ $ ./check_snmp_time.pl -H switch1 --protocol 3 --username admin --authpassword p
 Timezone conversion with NTP reference:
 
 ```
-$. /check_snmp_time.pl -H firewall1 --timezone America/New_York --ntp-server time.nist.gov \
+$. /check_time_snmp.pl -H firewall1 --timezone America/New_York --ntp-server time.nist.gov \
         -w 60 -c 180 --verbose
 ```
