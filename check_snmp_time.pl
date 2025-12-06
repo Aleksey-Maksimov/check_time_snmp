@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 ########################################################################
 #
-# check_time_snmp.pl v3.3 (2025-08-05)
+# check_time_snmp.pl v3.4 (2025-12-01)
 #
 # Purpose:
 #   Nagios/Icinga plugin to check device time via SNMP against local time or NTP
@@ -23,7 +23,10 @@
 #   v3.1 (2025-08-05) - Improved time string cleaning and parsing
 #   v3.2 (2025-08-05) - Fixed thresholds, NTP time, and output format
 #   v3.3 (2025-08-05) - Perfdata label fix and precision improvements
-#
+#   v3.4 (2025-12-01) - Correct parsing when --time-format is used together with --timezone: create a DateTime from parsed components so the device's timezone is applied correctly (was incorrectly reinterpreting epoch).
+#                     - Avoid double/misapplied timezone conversion: timezone conversion block now only runs when time was parsed via the "fallback" branch.
+#                     - Support offset timezone strings like +0300 as +03:00 for DateTime::TimeZone.
+
 # Usage Examples:
 #   Basic SNMPv2c check:
 #     check_time_snmp.pl -H 192.168.1.1 -C public -w 60 -c 180
@@ -171,6 +174,8 @@ if ($snmp_output =~ /=\s+\S+:\s+(.*)$/) {
 
 # Parse device time string
 my $device_time_epoch;
+my $parsed_with_format = 0;    # NEW: track how we parsed (used by timezone handling)
+my $device_time_components;    # NEW: store components for fallback parsing
 if ($opt_time_format) {
     # Create a clean format string without quotes
     my $clean_format = $opt_time_format;
@@ -179,7 +184,31 @@ if ($opt_time_format) {
     
     eval {
         my $t = Time::Piece->strptime($device_time_str, $clean_format);
-        $device_time_epoch = $t->epoch;
+        
+        # Build a DateTime from parsed components so we can correctly apply device timezone
+        my ($sec,$min,$hour,$mday,$mon,$year) = ($t->sec, $t->min, $t->hour, $t->mday, $t->mon, $t->year);
+        $parsed_with_format = 1;    # parsed using provided format
+        
+        if ($opt_timezone) {
+            # Normalize timezone like +0300 -> +03:00 for DateTime
+            my $tz_name = $opt_timezone;
+            if ($tz_name =~ /^([+-])(\d{2})(\d{2})$/) { $tz_name = "$1$2:$3"; }
+
+            my $dt = DateTime->new(
+                year      => $year,
+                month     => $mon,
+                day       => $mday,
+                hour      => $hour,
+                minute    => $min,
+                second    => $sec,
+                time_zone => $tz_name
+            );
+            # Convert to epoch (UTC)
+            $device_time_epoch = $dt->epoch;
+        } else {
+            # No timezone specified — keep Time::Piece epoch (interpreted in local time of monitoring host)
+            $device_time_epoch = $t->epoch;
+        }
     };
     
     if ($@ || !defined $device_time_epoch) {
@@ -189,28 +218,34 @@ if ($opt_time_format) {
 } else {
     # Fallback to HOST-RESOURCES-MIB format parsing
     if ($device_time_str =~ /(\d+)\/(\d+)\/(\d+),(\d+):(\d+):(\d+)/) {
-        $device_time_epoch = timelocal($6, $5, $4, $2, $1 - 1, $3 - 1900);
+        my ($mo,$day,$yr,$hh,$mm,$ss) = ($1,$2,$3,$4,$5,$6);
+        $device_time_epoch = timelocal($ss, $mm, $hh, $day, $mo - 1, $yr - 1900);
+        # store components to allow correct timezone conversion later if requested
+        $device_time_components = { year=>$yr, month=>$mo, day=>$day, hour=>$hh, minute=>$mm, second=>$ss };
     } else {
         print "UNKNOWN: Unrecognized time format: $device_time_str\n";
         exit $ERRORS{'UNKNOWN'};
     }
 }
 
-# Apply timezone conversion if specified
-if ($opt_timezone) {
+# Apply timezone conversion if specified AND we used the fallback parsing
+if ($opt_timezone && !$parsed_with_format) {
     eval {
-        my $tz;
-        if ($opt_timezone =~ /^[+-]\d{4}$/) {
-            $tz = DateTime::TimeZone->new(name => $opt_timezone);
-        } else {
-            $tz = DateTime::TimeZone->new(name => $opt_timezone);
+        my $tz_name = $opt_timezone;
+        if ($tz_name =~ /^([+-])(\d{2})(\d{2})$/) { $tz_name = "$1$2:$3"; }
+        
+        if ($device_time_components) {
+            my $dt = DateTime->new(
+                year      => $device_time_components->{year},
+                month     => $device_time_components->{month},
+                day       => $device_time_components->{day},
+                hour      => $device_time_components->{hour},
+                minute    => $device_time_components->{minute},
+                second    => $device_time_components->{second},
+                time_zone => $tz_name,
+            );
+            $device_time_epoch = $dt->epoch;
         }
-        my $dt = DateTime->from_epoch(
-            epoch     => $device_time_epoch,
-            time_zone => $tz
-        );
-        $dt->set_time_zone('UTC');
-        $device_time_epoch = $dt->epoch;
     };
     if ($@) {
         print "UNKNOWN: Invalid timezone '$opt_timezone': $@\n";
